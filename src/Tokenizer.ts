@@ -419,6 +419,32 @@ export class _Tokenizer<ParserOutput = string, RendererOutput = string> {
       for (const item of list.items) {
         this.lexer.state.top = false;
         item.tokens = this.lexer.blockTokens(item.text, []);
+
+        if (!list.loose) {
+          // Check if list should be loose
+          const spacers = item.tokens.filter(t => t.type === 'space');
+          const hasMultipleLineBreaks = spacers.length > 0 && spacers.some(t => this.rules.other.anyLine.test(t.raw));
+
+          list.loose = hasMultipleLineBreaks;
+        }
+      }
+
+      // Set all items to loose if list is loose
+      if (list.loose) {
+        for (const item of list.items) {
+          item.loose = true;
+          for (const token of item.tokens) {
+            if (token.type === 'text') {
+              token.type = 'paragraph';
+            }
+          }
+        }
+      }
+
+      // Add task checkbox tokens after the list's loose state is finalized so
+      // every item is wrapped consistently, including when the list became
+      // loose because of a later sibling or a nested list
+      for (const item of list.items) {
         const itemToken = item.tokens[0];
         if (item.task && (itemToken?.type === 'text' || itemToken?.type === 'paragraph')) {
           // Remove checkbox markdown from item tokens
@@ -440,7 +466,7 @@ export class _Tokenizer<ParserOutput = string, RendererOutput = string> {
               checked: taskRaw[0] !== '[ ]',
             };
             item.checked = checkboxToken.checked;
-            if (list.loose) {
+            if (item.loose) {
               if (item.tokens[0] && ['paragraph', 'text'].includes(item.tokens[0].type) && 'tokens' in item.tokens[0] && item.tokens[0].tokens) {
                 item.tokens[0].raw = checkboxToken.raw + item.tokens[0].raw;
                 item.tokens[0].text = checkboxToken.raw + item.tokens[0].text;
@@ -459,26 +485,6 @@ export class _Tokenizer<ParserOutput = string, RendererOutput = string> {
           }
         } else if (item.task) {
           item.task = false;
-        }
-
-        if (!list.loose) {
-          // Check if list should be loose
-          const spacers = item.tokens.filter(t => t.type === 'space');
-          const hasMultipleLineBreaks = spacers.length > 0 && spacers.some(t => this.rules.other.anyLine.test(t.raw));
-
-          list.loose = hasMultipleLineBreaks;
-        }
-      }
-
-      // Set all items to loose if list is loose
-      if (list.loose) {
-        for (const item of list.items) {
-          item.loose = true;
-          for (const token of item.tokens) {
-            if (token.type === 'text') {
-              token.type = 'paragraph';
-            }
-          }
         }
       }
 

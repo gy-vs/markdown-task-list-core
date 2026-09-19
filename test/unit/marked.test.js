@@ -964,6 +964,84 @@ paragraph
     });
   });
 
+  describe('GFM task lists', () => {
+    beforeEach(() => {
+      marked.setOptions({ gfm: true });
+    });
+
+    it('should keep checkboxes outside paragraphs in tight lists', () => {
+      assert.strictEqual(
+        marked.parse('- [x] one\n- [ ] two\n'),
+        '<ul>\n<li><input checked="" disabled="" type="checkbox"> one</li>\n<li><input disabled="" type="checkbox"> two</li>\n</ul>\n',
+      );
+    });
+
+    it('should put every checkbox inside the first paragraph when the list is loose', () => {
+      const html = marked.parse('- [x] one\n- [ ] two\n\n- [x] three\n');
+      assert.strictEqual(html, '<ul>\n'
+        + '<li><p><input checked="" disabled="" type="checkbox"> one</p>\n</li>\n'
+        + '<li><p><input disabled="" type="checkbox"> two</p>\n</li>\n'
+        + '<li><p><input checked="" disabled="" type="checkbox"> three</p>\n</li>\n'
+        + '</ul>\n');
+    });
+
+    it('should wrap checkboxes consistently when the list is made loose by a later item', () => {
+      const html = marked.parse('- [x] one\n- [ ] two\n\n  paragraph in second item\n- [x] three\n');
+      assert.match(html, /<li><p><input checked="" disabled="" type="checkbox"> one<\/p>/);
+      assert.match(html, /<li><p><input disabled="" type="checkbox"> two<\/p>/);
+      assert.match(html, /<li><p><input checked="" disabled="" type="checkbox"> three<\/p>/);
+    });
+
+    it('should mix tight and loose wrapping across three nesting levels', () => {
+      const md = '- [x] outer task\n'
+        + '  - [ ] middle task one\n'
+        + '    - [x] inner task one\n'
+        + '    - [ ] inner task two\n'
+        + '\n'
+        + '    middle paragraph\n'
+        + '  - [x] middle task two\n'
+        + '- [ ] outer sibling\n';
+      const html = marked.parse(md);
+      // outer list is tight: checkbox before the item text, no <p>
+      assert.match(html, /<li><input checked="" disabled="" type="checkbox"> outer task<ul>/);
+      assert.match(html, /<li><input disabled="" type="checkbox"> outer sibling<\/li>/);
+      // middle list is loose: checkbox inside the first <p> of every item
+      assert.match(html, /<li><p><input disabled="" type="checkbox"> middle task one<\/p>/);
+      assert.match(html, /<li><p><input checked="" disabled="" type="checkbox"> middle task two<\/p>/);
+      // inner list is still tight
+      assert.match(html, /<ul>\n<li><input checked="" disabled="" type="checkbox"> inner task one<\/li>\n<li><input disabled="" type="checkbox"> inner task two<\/li>\n<\/ul>/);
+    });
+
+    it('should use a custom checkbox renderer at every nesting level', () => {
+      marked.use({
+        renderer: {
+          checkbox({ checked }) {
+            return `<span class="cb${checked ? ' on' : ''}"></span> `;
+          },
+        },
+      });
+      const html = marked.parse('- [x] outer\n  - [ ] middle\n\n    middle paragraph\n');
+      assert.match(html, /<li><span class="cb on"><\/span> outer<ul>/);
+      assert.match(html, /<li><p><span class="cb"><\/span> middle<\/p>/);
+    });
+
+    it('should fall back to the default checkbox renderer inside nested loose lists if the extension returns false', () => {
+      marked.use({
+        extensions: [{
+          name: 'checkbox',
+          renderer(token) {
+            return token.checked ? false : '<span class="todo"></span> ';
+          },
+        }],
+      });
+      const md = '- [x] outer\n  - [x] middle one\n  - [ ] middle two\n\n    paragraph\n';
+      const html = marked.parse(md);
+      assert.match(html, /<li><p><input checked="" disabled="" type="checkbox"> middle one<\/p>/);
+      assert.match(html, /<li><p><span class="todo"><\/span> middle two<\/p>/);
+      assert.match(html, /<li><input checked="" disabled="" type="checkbox"> outer<ul>/);
+    });
+  });
+
   describe('walkTokens', () => {
     it('should walk over every token', () => {
       const markdown = `
