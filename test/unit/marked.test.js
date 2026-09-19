@@ -422,6 +422,32 @@ describe('marked unit', () => {
       assert.strictEqual(html, '<ul>\n<li><p><input checked="" disabled="" type="checkbox"> one</p>\n</li>\n<li><p><input disabled="" type="checkbox"> two</p>\n</li>\n</ul>\n');
     });
 
+    it('should render checkboxes with a custom renderer when a nested list makes the list loose', () => {
+      marked.use({
+        extensions: [{
+          name: 'checkbox',
+          renderer(token) {
+            return token.checked ? '<span class="done"></span> ' : '<span class="todo"></span> ';
+          },
+        }],
+      });
+      const html = marked.parse('- [ ] one\n- two\n\n  - [ ] nested\n- [x] three\n');
+      assert.strictEqual(html, '<ul>\n<li><p><span class="todo"></span> one</p>\n</li>\n<li><p>two</p>\n<ul>\n<li><span class="todo"></span> nested</li>\n</ul>\n</li>\n<li><p><span class="done"></span> three</p>\n</li>\n</ul>\n');
+    });
+
+    it('should fall back to the default checkbox renderer when a nested list makes the list loose', () => {
+      marked.use({
+        extensions: [{
+          name: 'checkbox',
+          renderer() {
+            return false;
+          },
+        }],
+      });
+      const html = marked.parse('- [ ] one\n- two\n\n  - [ ] nested\n- [x] three\n');
+      assert.strictEqual(html, '<ul>\n<li><p><input disabled="" type="checkbox"> one</p>\n</li>\n<li><p>two</p>\n<ul>\n<li><input disabled="" type="checkbox"> nested</li>\n</ul>\n</li>\n<li><p><input checked="" disabled="" type="checkbox"> three</p>\n</li>\n</ul>\n');
+    });
+
     it('should walk only specified child tokens', () => {
       const walkableDescription = {
         extensions: [{

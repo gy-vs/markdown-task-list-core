@@ -431,32 +431,6 @@ export class _Tokenizer<ParserOutput = string, RendererOutput = string> {
               break;
             }
           }
-
-          const taskRaw = this.rules.other.listTaskCheckbox.exec(item.raw);
-          if (taskRaw) {
-            const checkboxToken: Tokens.Checkbox = {
-              type: 'checkbox',
-              raw: taskRaw[0] + ' ',
-              checked: taskRaw[0] !== '[ ]',
-            };
-            item.checked = checkboxToken.checked;
-            if (list.loose) {
-              if (item.tokens[0] && ['paragraph', 'text'].includes(item.tokens[0].type) && 'tokens' in item.tokens[0] && item.tokens[0].tokens) {
-                item.tokens[0].raw = checkboxToken.raw + item.tokens[0].raw;
-                item.tokens[0].text = checkboxToken.raw + item.tokens[0].text;
-                item.tokens[0].tokens.unshift(checkboxToken);
-              } else {
-                item.tokens.unshift({
-                  type: 'paragraph',
-                  raw: checkboxToken.raw,
-                  text: checkboxToken.raw,
-                  tokens: [checkboxToken],
-                });
-              }
-            } else {
-              item.tokens.unshift(checkboxToken);
-            }
-          }
         } else if (item.task) {
           item.task = false;
         }
@@ -479,6 +453,45 @@ export class _Tokenizer<ParserOutput = string, RendererOutput = string> {
               token.type = 'paragraph';
             }
           }
+        }
+      }
+
+      // Checkbox tokens are inserted only after the loose state of the list is
+      // final so that every item places its checkbox based on the final
+      // item.loose/list.loose state instead of the state at the time the item
+      // was tokenized.
+      for (const item of list.items) {
+        if (!item.task) {
+          continue;
+        }
+
+        const taskRaw = this.rules.other.listTaskCheckbox.exec(item.raw);
+        if (!taskRaw) {
+          continue;
+        }
+
+        const checkboxToken: Tokens.Checkbox = {
+          type: 'checkbox',
+          raw: taskRaw[0] + ' ',
+          checked: taskRaw[0] !== '[ ]',
+        };
+        item.checked = checkboxToken.checked;
+        if (item.loose) {
+          const itemToken = item.tokens[0];
+          if (itemToken && ['paragraph', 'text'].includes(itemToken.type) && 'tokens' in itemToken && itemToken.tokens) {
+            itemToken.raw = checkboxToken.raw + itemToken.raw;
+            itemToken.text = checkboxToken.raw + itemToken.text;
+            itemToken.tokens.unshift(checkboxToken);
+          } else {
+            item.tokens.unshift({
+              type: 'paragraph',
+              raw: checkboxToken.raw,
+              text: checkboxToken.raw,
+              tokens: [checkboxToken],
+            });
+          }
+        } else {
+          item.tokens.unshift(checkboxToken);
         }
       }
 
